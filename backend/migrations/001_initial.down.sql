@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS hydration_logs;
+DROP TABLE IF EXISTS journal_entries;
+DROP TABLE IF EXISTS cycles;
+DROP TABLE IF EXISTS sync_changes;
+DROP TABLE IF EXISTS users;
