@@ -22,7 +22,7 @@
 
 | Feature | Free | Pro | Team |
 |---------|------|-----|------|
-| Focus cycles per day | 2 | Unlimited | Unlimited |
+| Focus cycles per day | 3 | Unlimited | Unlimited |
 | Timer durations | 45, 60, 90 min | Custom (15-120 min) | Custom |
 | Transition ritual | ✓ | ✓ | ✓ |
 | Hydration tracking | ✓ | ✓ | ✓ |
@@ -41,7 +41,7 @@
 
 ### Why This Gating
 
-- **Free tier is generous enough to form the habit** — 2 cycles/day covers a casual user. They feel the value before hitting the wall.
+- **Free tier is generous enough to form the habit** — 3 cycles/day lets users build a full-day habit before hitting the wall — research shows 2 caps them by ~2 pm (rec #4).
 - **Watch is Pro-only** — Watch users are power users with high willingness to pay. This is the #1 conversion driver.
 - **AI features are Pro-only** — Ongoing cost to serve, justifies subscription.
 - **Team features are separate tier** — Different buyer (manager/company), different value prop.
@@ -133,7 +133,7 @@
 
 - **Not on first launch** — Let users complete their first cycle. Feel the value.
 - **After 3rd cycle** — "You've completed 3 cycles! Unlock unlimited with Pro."
-- **When hitting free limit** — "You've used your 2 free cycles today. Start fresh tomorrow, or go Pro."
+- **When hitting free limit** — "You've used your 3 free cycles today. Start fresh tomorrow, or go Pro."
 - **Feature discovery** — Tapping Watch setup, voice journal, or AI summary shows soft paywall.
 
 ### Paywall Design
