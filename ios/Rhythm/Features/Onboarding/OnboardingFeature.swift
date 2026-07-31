@@ -1,8 +1,23 @@
 import ComposableArchitecture
+import Foundation
+
+/// Persisted flag for whether first-run onboarding has completed.
+/// Kept lightweight (UserDefaults) so the app can gate synchronously at launch
+/// with no flicker. Not injected — this is a simple first-run marker.
+enum OnboardingStatus {
+    private static let key = "rhythm.onboardingComplete.v1"
+    static var isComplete: Bool { UserDefaults.standard.bool(forKey: key) }
+    static func markComplete() { UserDefaults.standard.set(true, forKey: key) }
+}
 
 @Reducer
 struct OnboardingFeature {
-    enum Step: Equatable { case welcome, notifications, healthKit, duration, done }
+    // Research rec #1 (docs/RESEARCH_FINDINGS_2026.md): deliver a first-value
+    // moment (a real breathing reset) BEFORE asking for notifications/health.
+    // Permission prompts come only after the user has felt the core loop.
+    enum Step: Equatable, CaseIterable {
+        case welcome, miniCycle, duration, notifications, healthKit, done
+    }
 
     @ObservableState
     struct State: Equatable {
@@ -30,13 +45,19 @@ struct OnboardingFeature {
             switch action {
             case .nextTapped:
                 switch state.step {
-                case .welcome: state.step = .notifications
-                case .notifications: state.step = .healthKit
-                case .healthKit: state.step = .duration
+                case .welcome:
+                    state.step = .miniCycle
+                case .miniCycle:
+                    state.step = .duration
                 case .duration:
+                    state.step = .notifications
+                case .notifications:
+                    state.step = .healthKit
+                case .healthKit:
                     state.step = .done
                     return .send(.completed(focusDuration: state.selectedDuration))
-                case .done: break
+                case .done:
+                    break
                 }
                 return .none
 

@@ -1,0 +1,11 @@
+# The Xcode project is generated from project.yml by XcodeGen.
+# Commit project.yml (the source of truth); regenerate with `xcodegen generate`.
+Rhythm.xcodeproj/
+
+# Xcode / SwiftPM build artifacts
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+Package.resolved

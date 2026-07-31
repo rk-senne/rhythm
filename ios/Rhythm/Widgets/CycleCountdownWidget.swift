@@ -22,12 +22,14 @@ struct RhythmProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (RhythmEntry) -> Void) {
-        completion(RhythmEntry(date: .now, cyclesCompleted: 2, cyclesGoal: 4, upcomingEvents: []))
+        let p = SharedProgressStore.read()
+        completion(RhythmEntry(date: .now, cyclesCompleted: p.cyclesCompleted, cyclesGoal: p.cyclesGoal, upcomingEvents: []))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<RhythmEntry>) -> Void) {
-        // TODO: read from App Group shared container
-        let entry = RhythmEntry(date: .now, cyclesCompleted: 0, cyclesGoal: 4, upcomingEvents: [])
+        // Read live progress written by the app into the App Group container.
+        let p = SharedProgressStore.read()
+        let entry = RhythmEntry(date: .now, cyclesCompleted: p.cyclesCompleted, cyclesGoal: p.cyclesGoal, upcomingEvents: [])
         completion(Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(900))))
     }
 }
@@ -157,6 +159,9 @@ struct RhythmWidgets: WidgetBundle {
         ProgressRingWidget()
         MiniTimelineWidget()
         CycleCountdownWidget()
+        // Live Activity (focus session countdown on Lock Screen / Dynamic Island).
+        // Shared with the app target via file membership in project.yml.
+        FocusSessionLiveActivity()
     }
 }
 

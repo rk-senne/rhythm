@@ -1,105 +1,107 @@
 package ai
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"os"
+	"errors"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type SummaryService struct {
-	db *pgxpool.Pool
-}
+// ErrRateLimited is returned when a user exceeds their AI summary allowance.
+var ErrRateLimited = errors.New("ai summary rate limit exceeded")
 
-func NewSummaryService(db *pgxpool.Pool) *SummaryService {
-	return &SummaryService{db: db}
-}
+const emptyWeekMessage = "No journal entries this week. Start reflecting after your focus sessions!"
 
-type journalRow struct {
+// defaultCacheTTL is how long a generated weekly summary is served from cache
+// before regeneration (bounds OpenAI spend; a day-stale weekly summary is fine).
+const defaultCacheTTL = 24 * time.Hour
+
+// JournalEntry is a single reflection used to build a weekly summary.
+type JournalEntry struct {
 	Text      string    `json:"text"`
 	Mood      *string   `json:"mood"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func (s *SummaryService) GenerateWeeklySummary(ctx context.Context, userID string) (string, error) {
-	weekAgo := time.Now().AddDate(0, 0, -7)
-	rows, err := s.db.Query(ctx,
-		`SELECT text, mood, created_at FROM journal_entries 
-		 WHERE user_id = $1 AND created_at > $2 ORDER BY created_at`,
-		userID, weekAgo,
-	)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-
-	var entries []journalRow
-	for rows.Next() {
-		var e journalRow
-		if err := rows.Scan(&e.Text, &e.Mood, &e.CreatedAt); err != nil {
-			continue
-		}
-		entries = append(entries, e)
-	}
-
-	if len(entries) == 0 {
-		return "No journal entries this week. Start reflecting after your focus sessions!", nil
-	}
-
-	return s.callOpenAI(ctx, entries)
+// JournalStore fetches a user's recent journal entries.
+type JournalStore interface {
+	WeeklyEntries(ctx context.Context, userID string) ([]JournalEntry, error)
 }
 
-func (s *SummaryService) callOpenAI(ctx context.Context, entries []journalRow) (string, error) {
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return "", fmt.Errorf("OPENAI_API_KEY not set")
+// Summarizer turns journal entries into a natural-language summary (e.g. via an
+// LLM). Abstracted so the OpenAI call can be faked in tests.
+type Summarizer interface {
+	Summarize(ctx context.Context, entries []JournalEntry) (string, error)
+}
+
+// RateLimiter guards expensive operations on a per-key basis.
+type RateLimiter interface {
+	Allow(ctx context.Context, key string) (bool, error)
+}
+
+// Cache stores generated summaries so we don't pay to regenerate them on every
+// request (the previous behavior hit OpenAI on every call).
+type Cache interface {
+	Get(ctx context.Context, key string) (string, bool, error)
+	Set(ctx context.Context, key, value string, ttl time.Duration) error
+}
+
+// SummaryService orchestrates cache -> rate limit -> fetch -> summarize.
+type SummaryService struct {
+	store      JournalStore
+	summarizer Summarizer
+	limiter    RateLimiter
+	cache      Cache
+	cacheTTL   time.Duration
+}
+
+func NewSummaryService(store JournalStore, summarizer Summarizer, limiter RateLimiter, cache Cache) *SummaryService {
+	return &SummaryService{
+		store:      store,
+		summarizer: summarizer,
+		limiter:    limiter,
+		cache:      cache,
+		cacheTTL:   defaultCacheTTL,
+	}
+}
+
+// GenerateWeeklySummary returns a cached summary if available; otherwise it
+// checks the per-user rate limit, fetches entries, generates a summary, and
+// caches it. Cache hits do not consume rate-limit budget.
+func (s *SummaryService) GenerateWeeklySummary(ctx context.Context, userID string) (string, error) {
+	cacheKey := "ai:summary:" + userID
+
+	if s.cache != nil {
+		if v, ok, err := s.cache.Get(ctx, cacheKey); err == nil && ok {
+			return v, nil
+		}
 	}
 
-	entriesJSON, _ := json.Marshal(entries)
-	prompt := fmt.Sprintf(`You are a thoughtful productivity coach. Given these journal entries from the past week, write a brief, warm weekly summary (3-5 sentences). Highlight patterns, wins, and gentle suggestions. Keep it under 200 words.
-
-Journal entries:
-%s`, string(entriesJSON))
-
-	body := map[string]any{
-		"model": "gpt-4o-mini",
-		"messages": []map[string]string{
-			{"role": "system", "content": "You are a calm, supportive productivity coach."},
-			{"role": "user", "content": prompt},
-		},
-		"max_tokens":  300,
-		"temperature": 0.7,
+	if s.limiter != nil {
+		allowed, err := s.limiter.Allow(ctx, "ai:rate:"+userID)
+		if err != nil {
+			return "", err
+		}
+		if !allowed {
+			return "", ErrRateLimited
+		}
 	}
 
-	payload, _ := json.Marshal(body)
-	req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-
-	resp, err := http.DefaultClient.Do(req)
+	entries, err := s.store.WeeklyEntries(ctx, userID)
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
-
-	var result struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
+	if len(entries) == 0 {
+		return emptyWeekMessage, nil
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+
+	summary, err := s.summarizer.Summarize(ctx, entries)
+	if err != nil {
 		return "", err
 	}
-	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("no response from OpenAI")
-	}
 
-	return result.Choices[0].Message.Content, nil
+	if s.cache != nil {
+		// Best-effort cache write; a failure here shouldn't fail the request.
+		_ = s.cache.Set(ctx, cacheKey, summary, s.cacheTTL)
+	}
+	return summary, nil
 }

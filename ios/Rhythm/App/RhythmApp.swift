@@ -4,7 +4,11 @@ import ComposableArchitecture
 
 @main
 struct RhythmApp: App {
-    let store = Store(initialState: AppFeature.State()) {
+    let store = Store(
+        initialState: AppFeature.State(
+            onboarding: OnboardingStatus.isComplete ? nil : OnboardingFeature.State()
+        )
+    ) {
         AppFeature()
     }
 

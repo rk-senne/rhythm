@@ -19,6 +19,18 @@ struct SettingsView: View {
                 Section("Hydration") {
                     Stepper("Goal: \(store.dailyHydrationGoalMl) ml", value: $store.dailyHydrationGoalMl, in: 500...5000, step: 250)
                 }
+                Section("Account") {
+                    if store.isSignedIn {
+                        Label("Signed in with Apple", systemImage: "checkmark.seal.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Button {
+                            store.send(.signInTapped)
+                        } label: {
+                            Label("Sign in with Apple", systemImage: "apple.logo")
+                        }
+                    }
+                }
             }
             .navigationTitle("Settings")
             .onAppear { store.send(.onAppear) }

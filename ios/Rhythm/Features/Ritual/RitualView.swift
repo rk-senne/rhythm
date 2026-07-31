@@ -34,6 +34,7 @@ struct RitualView: View {
 }
 
 struct BreatheView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase: BreathePhase = .inhale
     @State private var scale: CGFloat = 0.4
     @State private var breathCount: Int = 0
@@ -63,6 +64,7 @@ struct BreatheView: View {
                     .frame(width: 100, height: 100)
                     .scaleEffect(scale)
             }
+            .accessibilityHidden(true) // decorative; the phase text conveys state
 
             Text("\(breathCount)/\(totalBreaths)")
                 .font(.caption)
@@ -76,13 +78,21 @@ struct BreatheView: View {
         inhale()
     }
 
+    // Animate the circle unless the user prefers reduced motion, in which case
+    // the breath is still guided by the phase text and haptics.
+    private func setScale(_ value: CGFloat) {
+        if reduceMotion {
+            scale = value
+        } else {
+            withAnimation(.easeInOut(duration: breathDuration)) { scale = value }
+        }
+    }
+
     private func inhale() {
         guard breathCount < totalBreaths else { return }
         phase = .inhale
         HapticEngine.breatheIn()
-        withAnimation(.easeInOut(duration: breathDuration)) {
-            scale = 1.0
-        }
+        setScale(1.0)
         DispatchQueue.main.asyncAfter(deadline: .now() + breathDuration) {
             exhale()
         }
@@ -91,9 +101,7 @@ struct BreatheView: View {
     private func exhale() {
         phase = .exhale
         HapticEngine.breatheOut()
-        withAnimation(.easeInOut(duration: breathDuration)) {
-            scale = 0.4
-        }
+        setScale(0.4)
         DispatchQueue.main.asyncAfter(deadline: .now() + breathDuration) {
             breathCount += 1
             inhale()

@@ -1,10 +1,11 @@
 package ai
 
 import (
-	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/rhythm-app/rhythm-api/internal/auth"
+	"github.com/rhythm-app/rhythm-api/internal/web"
 )
 
 type Handler struct {
@@ -16,13 +17,21 @@ func NewHandler(service *SummaryService) *Handler {
 }
 
 func (h *Handler) GetWeeklySummary(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(auth.UserIDKey).(string)
-
-	summary, err := h.service.GenerateWeeklySummary(r.Context(), userID)
-	if err != nil {
-		http.Error(w, "failed to generate summary", http.StatusInternalServerError)
+	userID, ok := r.Context().Value(auth.UserIDKey).(string)
+	if !ok || userID == "" {
+		web.Error(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"summary": summary})
+	summary, err := h.service.GenerateWeeklySummary(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, ErrRateLimited) {
+			web.Error(w, http.StatusTooManyRequests, "weekly summary already generated recently; try again later")
+			return
+		}
+		web.Error(w, http.StatusInternalServerError, "failed to generate summary")
+		return
+	}
+
+	web.JSON(w, http.StatusOK, map[string]string{"summary": summary})
 }
