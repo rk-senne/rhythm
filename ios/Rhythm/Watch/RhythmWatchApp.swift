@@ -166,24 +166,11 @@ struct WatchVoiceJournalView: View {
             Image(systemName: "mic.circle.fill")
                 .font(.largeTitle)
                 .foregroundStyle(.indigo)
-            Text(transcription.isEmpty ? "Tap mic to record" : transcription)
-                .font(.caption)
+            // On watchOS a TextField brings up the system input (scribble +
+            // dictation), which replaces the deprecated WKExtension text-input
+            // controller and keeps this a pure SwiftUI view.
+            TextField("Reflect…", text: $transcription, axis: .vertical)
                 .multilineTextAlignment(.center)
-        }
-        .onTapGesture {
-            // WKAudioRecorderController or dictation in watchOS 10+
-            presentTextInputController()
-        }
-    }
-
-    private func presentTextInputController() {
-        WKExtension.shared().visibleInterfaceController?.presentTextInputController(
-            withSuggestions: ["Great session", "Felt distracted", "Deep flow"],
-            allowedInputMode: .allowAnimatedEmoji
-        ) { results in
-            if let text = results?.first as? String {
-                transcription = text
-            }
         }
     }
 }

@@ -120,11 +120,12 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   -derivedDataPath .build/dd CODE_SIGNING_ALLOWED=NO -skipMacroValidation test
 ```
 
-> ⚠️ **watchOS SDK:** this environment did not have the watchOS 11.5 SDK, so the
-> embedded `RhythmWatch` target was **not compile-verified here**. On a normal
-> Xcode install (which includes the watchOS SDK) the full scheme builds. If you
-> need to build the iOS app on a machine without the watchOS SDK, temporarily
-> comment the `RhythmWatch` embed in `project.yml` and regenerate.
+> ✅ **watchOS:** after installing the watch platform
+> (`xcodebuild -downloadPlatform watchOS`), the `RhythmWatch` target **and the
+> full scheme (app + widget + watch)** build, and all tests run **with the watch
+> attached** — verified. On a machine that lacks the watchOS platform, either
+> install it the same way or temporarily comment the `RhythmWatch` embed in
+> `project.yml` and regenerate.
 
 ## 8. Remaining before it builds cleanly on device
 
@@ -138,7 +139,9 @@ App Store submission you'll still want to:
 - Replace silent `try?` calls with user-facing error states.
 - Compile-verify the `RhythmWatch` target on a machine with the watchOS SDK; the
   watch **complication** also needs its own watch widget-extension target to
-  appear on a watch face.
+  appear on a watch face. *(Update: `RhythmWatch` now compiles and the full
+  scheme builds/tests with the watch attached; only the complication
+  widget-extension remains.)*
 
 ## 9. Regeneration workflow
 
