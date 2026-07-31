@@ -82,6 +82,7 @@ struct AppFeature {
                 let startedAt = state.timer.startedAt
                 let journal = state.ritual.journalText
                 let hydrated = state.ritual.hydrated
+                let mood = state.ritual.mood
                 // Reset ritual for next time
                 state.ritual = RitualFeature.State()
                 return .run { send in
@@ -96,9 +97,9 @@ struct AppFeature {
                         ritualCompleted: true
                     ))
 
-                    if !journal.isEmpty {
-                        try await dataClient.saveJournal(journalId, cycleId, journal, nil)
-                        changes.append(SyncPayloads.journalChange(id: journalId, cycleId: cycleId, text: journal, mood: nil))
+                    if !journal.isEmpty || mood != nil {
+                        try await dataClient.saveJournal(journalId, cycleId, journal, mood)
+                        changes.append(SyncPayloads.journalChange(id: journalId, cycleId: cycleId, text: journal, mood: mood))
                     }
 
                     if hydrated {

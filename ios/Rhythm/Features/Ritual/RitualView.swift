@@ -15,10 +15,14 @@ struct RitualView: View {
                         store.send(.hydrateToggled)
                     }
                 case .journal:
-                    JournalView(text: Binding(
-                        get: { store.journalText },
-                        set: { store.send(.journalTextChanged($0)) }
-                    ))
+                    JournalView(
+                        text: Binding(
+                            get: { store.journalText },
+                            set: { store.send(.journalTextChanged($0)) }
+                        ),
+                        selectedMood: store.mood,
+                        onMoodSelected: { store.send(.moodSelected($0)) }
+                    )
                 case .complete:
                     Text("Ritual complete ✓")
                         .font(.title)
@@ -142,14 +146,71 @@ struct HydrateView: View {
 
 struct JournalView: View {
     @Binding var text: String
+    let selectedMood: Mood?
+    let onMoodSelected: (Mood?) -> Void
 
     var body: some View {
-        VStack {
+        VStack(spacing: 16) {
             Text("Reflect")
                 .font(.largeTitle)
             TextField("How was your focus?", text: $text, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(3...6)
+            MoodPickerView(selectedMood: selectedMood, onMoodSelected: onMoodSelected)
+        }
+    }
+}
+
+struct MoodPickerView: View {
+    let selectedMood: Mood?
+    let onMoodSelected: (Mood?) -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text("Mood")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                ForEach(Mood.allCases, id: \.self) { mood in
+                    Button {
+                        let newValue: Mood? = selectedMood == mood ? nil : mood
+                        onMoodSelected(newValue)
+                    } label: {
+                        Text(mood.emoji)
+                            .font(.title2)
+                            .padding(8)
+                            .background(
+                                Circle()
+                                    .fill(selectedMood == mood ? Color.accentColor.opacity(0.2) : Color.clear)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(mood.accessibilityLabel)
+                    .accessibilityAddTraits(selectedMood == mood ? .isSelected : [])
+                }
+            }
+        }
+    }
+}
+
+private extension Mood {
+    var emoji: String {
+        switch self {
+        case .great: "😄"
+        case .good: "🙂"
+        case .neutral: "😐"
+        case .low: "😔"
+        case .rough: "😣"
+        }
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .great: "Great"
+        case .good: "Good"
+        case .neutral: "Neutral"
+        case .low: "Low"
+        case .rough: "Rough"
         }
     }
 }

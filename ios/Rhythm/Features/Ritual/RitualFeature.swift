@@ -9,12 +9,14 @@ struct RitualFeature {
         var currentStep: Step = .breathe
         var hydrated: Bool = false
         var journalText: String = ""
+        var mood: Mood?
     }
 
     enum Action {
         case nextStep
         case hydrateToggled
         case journalTextChanged(String)
+        case moodSelected(Mood?)
         case completed
     }
 
@@ -34,6 +36,9 @@ struct RitualFeature {
                 return .none
             case let .journalTextChanged(text):
                 state.journalText = text
+                return .none
+            case let .moodSelected(mood):
+                state.mood = mood
                 return .none
             case .completed:
                 return .none
